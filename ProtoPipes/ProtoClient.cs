@@ -95,7 +95,10 @@ namespace ProtoPipes
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            await Start();
+            if (!_clientStream.IsConnected)
+            {
+                Console.WriteLine("Server has disconnected. Exiting.");
+            }
         }
 
         public void Stop()

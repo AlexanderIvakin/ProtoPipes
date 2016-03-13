@@ -86,8 +86,12 @@ namespace ProtoPipes
                 catch(IOException)
                 {
                     Console.WriteLine("Client disconnected, reconnecting...");
+
                     _serverStream.Disconnect();
-                    await Start();                    
+
+                    _serverStream.Dispose();
+                    _serverStream = null;
+                                        
                     return;
                 }
             }
@@ -103,6 +107,10 @@ namespace ProtoPipes
             if (_cts != null)
             {
                 _cts.Cancel();
+            }
+            if (_child != null)
+            {
+                _child.Stop();
             }
         }
 
