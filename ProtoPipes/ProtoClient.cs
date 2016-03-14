@@ -12,9 +12,9 @@ namespace ProtoPipes
 
         private CancellationTokenSource _cts;
 
-        private CancellationToken _cancellationToken;
+        private readonly CancellationToken _cancellationToken;
 
-        private int? _serverPid;
+        private readonly int? _serverPid;
 
         public ProtoClient(CancellationToken cancellationToken, int? serverPid)
         {
@@ -24,15 +24,9 @@ namespace ProtoPipes
         
         public Task Start()
         {
-            if (_clientStream != null)
-            {
-                _clientStream.Dispose();
-            }
+            _clientStream?.Dispose();
 
-            if (_cts != null)
-            {
-                _cts.Dispose();
-            }
+            _cts?.Dispose();
 
             _clientStream = new NamedPipeClientStream(".", "protopipe", PipeDirection.InOut, 
                 PipeOptions.Asynchronous | PipeOptions.WriteThrough);
@@ -68,7 +62,7 @@ namespace ProtoPipes
             {
                 do
                 {
-                    var bytesRead = await _clientStream.ReadAsync(buffer, 0, bufferLength);
+                    await _clientStream.ReadAsync(buffer, 0, bufferLength, cancellationToken);
                     sb.Append(Encoding.UTF8.GetString(buffer));
                 } while (!_clientStream.IsMessageComplete);
 
@@ -82,11 +76,9 @@ namespace ProtoPipes
                 if (split.Length > 1)
                 {
                     var receivedPid = int.Parse(split[0]);
-                    if (receivedPid != serverPid.Value)
-                    {
-                        Console.WriteLine($"Wrong server {receivedPid}. Attempting to reconnect to {serverPid}.");
-                        break;
-                    }
+                    if (receivedPid == serverPid.Value) continue;
+                    Console.WriteLine($"Wrong server {receivedPid}. Attempting to reconnect to {serverPid}.");
+                    break;
                 }                
             }
 
@@ -103,11 +95,8 @@ namespace ProtoPipes
 
         public void Stop()
         {
-            if (_cts != null)
-            {
-                _cts.Cancel();
-            }          
-        } 
+            _cts?.Cancel();
+        }
 
         public void Dispose()
         {

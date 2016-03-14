@@ -12,7 +12,7 @@ namespace ProtoPipes
     {
         private NamedPipeServerStream _serverStream;
 
-        private CancellationToken _cancellationToken;
+        private readonly CancellationToken _cancellationToken;
 
         private CancellationTokenSource _cts;
 
@@ -25,15 +25,9 @@ namespace ProtoPipes
 
         public Task Start()
         {
-            if (_serverStream != null)
-            {
-                _serverStream.Dispose();
-            }
+            _serverStream?.Dispose();
 
-            if (_cts != null)
-            {
-                _cts.Dispose();
-            }
+            _cts?.Dispose();
 
             _serverStream = new NamedPipeServerStream("protopipe", PipeDirection.InOut,
                 NamedPipeServerStream.MaxAllowedServerInstances,
@@ -50,7 +44,7 @@ namespace ProtoPipes
                     .FromAsync(_serverStream.BeginWaitForConnection,
                                _serverStream.EndWaitForConnection,
                                TaskCreationOptions.LongRunning)
-                    .ContinueWith(async t => await SpawnChild())
+                    .ContinueWith(async t => await SpawnChild(), linkedToken)
                     .ContinueWith(async t => await ServerLoop(linkedToken), linkedToken);
             }
         }
@@ -81,7 +75,7 @@ namespace ProtoPipes
                 var bytes = Encoding.UTF8.GetBytes(msg);
                 try
                 {
-                    await _serverStream.WriteAsync(bytes, 0, bytes.Length);
+                    await _serverStream.WriteAsync(bytes, 0, bytes.Length, cancellationToken);
                 }
                 catch(IOException)
                 {
@@ -104,14 +98,8 @@ namespace ProtoPipes
 
         public void Stop()
         {
-            if (_cts != null)
-            {
-                _cts.Cancel();
-            }
-            if (_child != null)
-            {
-                _child.Stop();
-            }
+            _cts?.Cancel();
+            _child?.Stop();
         }
 
         public void Dispose()
