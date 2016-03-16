@@ -65,13 +65,10 @@ namespace ProtoPipes
 
         private static void RunClient(CancellationToken cancellationToken, int? serverPid)
         {
-            if (!serverPid.HasValue)
-            {
-                serverPid = AskUserToWhichServerToConnect();
-            }
+            var pid = serverPid ?? AskUserToWhichServerToConnect();
 
-            _client = new ProtoClient(cancellationToken, serverPid);
-            _client.Run();
+            _client = new ProtoClient(pid);
+            _client.Run(cancellationToken);
         }
 
         private static int AskUserToWhichServerToConnect()

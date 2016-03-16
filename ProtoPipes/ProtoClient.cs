@@ -10,36 +10,22 @@ namespace ProtoPipes
     {
         private NamedPipeClientStream _clientStream;
 
-        private CancellationTokenSource _cts;
+        private readonly int _serverPid;
 
-        private readonly CancellationToken _cancellationToken;
-
-        private readonly int? _serverPid;
-
-        public ProtoClient(CancellationToken cancellationToken, int? serverPid)
+        public ProtoClient(int serverPid)
         {
-            _cancellationToken = cancellationToken;
             _serverPid = serverPid;
         }
         
-        public Task Run()
+        public Task Run(CancellationToken cancellationToken)
         {
             _clientStream?.Dispose();
-
-            _cts?.Dispose();
 
             _clientStream = new NamedPipeClientStream(".", "protopipe", PipeDirection.InOut, 
                 PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
-            _cts = new CancellationTokenSource();
-
-            using (var linkedTokenSource = CancellationTokenSource
-                .CreateLinkedTokenSource(_cancellationToken, _cts.Token))
-            {
-                var linkedToken = linkedTokenSource.Token;
-                return Task.Factory.StartNew(async p => await ListenLoop((int?)p, linkedToken),
-                    _serverPid, linkedToken);
-            }
+            return Task.Factory.StartNew(async p => await ListenLoop((int?)p, cancellationToken),
+                _serverPid, cancellationToken);                
         }
 
         private async Task ListenLoop(int? serverPid, CancellationToken cancellationToken)
@@ -91,13 +77,8 @@ namespace ProtoPipes
 
             if (doReconnect)
             {
-                await Run();
+                await Run(cancellationToken);
             }            
-        }
-
-        public void Stop()
-        {
-            _cts?.Cancel();
         }
 
         public void Dispose()
@@ -114,12 +95,6 @@ namespace ProtoPipes
             {
                 _clientStream.Dispose();
                 _clientStream = null;
-            }
-
-            if (_cts != null)
-            {
-                _cts.Dispose();
-                _cts = null;
             }
         }
     }
