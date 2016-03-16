@@ -36,42 +36,41 @@ namespace ProtoPipes
 
         private async Task ServerLoop(CancellationToken cancellationToken)
         {
-            if (cancellationToken.IsCancellationRequested)
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-
-            const int pauseMilliseconds = 2000;
-            const int maxRandom = 100;
-            var r = new Random();
-            var pid = Process.GetCurrentProcess().Id;
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                Thread.Sleep(pauseMilliseconds);
-
-                var msg = $"{pid}:{r.Next(maxRandom)}";
-                Console.WriteLine($"Server: {msg}.");
-                var bytes = Encoding.UTF8.GetBytes(msg);
-                try
+                const int pauseMilliseconds = 2000;
+                const int maxRandom = 100;
+                var r = new Random();
+                var pid = Process.GetCurrentProcess().Id;
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    await _serverStream.WriteAsync(bytes, 0, bytes.Length, cancellationToken);
+                    Thread.Sleep(pauseMilliseconds);
+
+                    var msg = $"{pid}:{r.Next(maxRandom)}";
+                    Console.WriteLine($"Server: {msg}.");
+                    var bytes = Encoding.UTF8.GetBytes(msg);
+                    try
+                    {
+                        await _serverStream.WriteAsync(bytes, 0, bytes.Length, cancellationToken);
+                    }
+                    catch (IOException)
+                    {
+                        Console.WriteLine("Client disconnected, reconnecting...");
+                        return;
+                    }
                 }
-                catch(IOException)
+
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    Console.WriteLine("Client disconnected, reconnecting...");
-
-                    _serverStream.Disconnect();
-
-                    _serverStream.Dispose();
-                    _serverStream = null;
-                                        
-                    return;
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
             }
-
-            if (cancellationToken.IsCancellationRequested)
+            finally
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                _serverStream.Disconnect();
+
+                _serverStream.Dispose();
+                _serverStream = null;
             }
         }
 
