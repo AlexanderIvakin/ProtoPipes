@@ -56,6 +56,7 @@ namespace ProtoPipes
             const int bufferLength = 1024;
             var buffer = new byte[bufferLength];
             var sb = new StringBuilder();
+            var doReconnect = false;
 
             while (_clientStream.IsConnected 
                 && !cancellationToken.IsCancellationRequested)
@@ -78,6 +79,7 @@ namespace ProtoPipes
                     var receivedPid = int.Parse(split[0]);
                     if (receivedPid == serverPid.Value) continue;
                     Console.WriteLine($"Wrong server {receivedPid}. Attempting to reconnect to {serverPid}.");
+                    doReconnect = true;
                     break;
                 }                
             }
@@ -87,7 +89,10 @@ namespace ProtoPipes
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            await Start();
+            if (doReconnect)
+            {
+                await Start();
+            }            
         }
 
         public void Stop()
