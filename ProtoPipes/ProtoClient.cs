@@ -62,8 +62,8 @@ namespace ProtoPipes
             {
                 do
                 {
-                    await _clientStream.ReadAsync(buffer, 0, bufferLength, cancellationToken);
-                    sb.Append(Encoding.UTF8.GetString(buffer));
+                    var bytesRead = await _clientStream.ReadAsync(buffer, 0, bufferLength, cancellationToken);
+                    sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
                 } while (!_clientStream.IsMessageComplete);
 
                 var msg = sb.ToString();
@@ -87,10 +87,7 @@ namespace ProtoPipes
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            if (!_clientStream.IsConnected)
-            {
-                Console.WriteLine("Server has disconnected. Exiting.");
-            }
+            await Start();
         }
 
         public void Stop()
