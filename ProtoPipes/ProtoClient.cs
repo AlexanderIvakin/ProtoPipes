@@ -22,7 +22,7 @@ namespace ProtoPipes
             _serverPid = serverPid;
         }
         
-        public Task Start()
+        public Task Run()
         {
             _clientStream?.Dispose();
 
@@ -91,7 +91,7 @@ namespace ProtoPipes
 
             if (doReconnect)
             {
-                await Start();
+                await Run();
             }            
         }
 

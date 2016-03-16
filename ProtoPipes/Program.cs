@@ -71,7 +71,7 @@ namespace ProtoPipes
             }
 
             _client = new ProtoClient(cancellationToken, serverPid);
-            _client.Start();
+            _client.Run();
         }
 
         private static int AskUserToWhichServerToConnect()
@@ -147,8 +147,8 @@ namespace ProtoPipes
 
         private static void RunServer(CancellationToken cancellationToken)
         {
-            _server = new ProtoServer(cancellationToken);
-            _server.Start();
+            _server = new ProtoServer();
+            _server.Run(cancellationToken);
         }
     }
 }
