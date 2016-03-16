@@ -79,7 +79,7 @@ namespace ProtoPipes
             using (var cts = new CancellationTokenSource())
             {
                 var token = cts.Token;
-                var servers = new ConcurrentDictionary<int, string>();
+                var servers = new ConcurrentDictionary<int, Guid>();
 
                 const int waitSeconds = 5;
                 const int maxTries = 5;

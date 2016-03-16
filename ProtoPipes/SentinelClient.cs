@@ -9,9 +9,9 @@ namespace ProtoPipes
 {
     public class SentinelClient
     {
-        private readonly ConcurrentDictionary<int, string> _sentinelServers;
+        private readonly ConcurrentDictionary<int, Guid> _sentinelServers;
 
-        public SentinelClient(ConcurrentDictionary<int, string> sentinelServers)
+        public SentinelClient(ConcurrentDictionary<int, Guid> sentinelServers)
         {
             _sentinelServers = sentinelServers;
         }
@@ -50,9 +50,11 @@ namespace ProtoPipes
                 if (split.Length > 1)
                 {                   
                     var receivedPid = int.Parse(split[0].Trim());
-                    var receivedServerMsg = split[1].Trim();
-                    Console.WriteLine($"SentinelClient received: {receivedPid} - {receivedServerMsg}.");
-                    _sentinelServers.TryAdd(receivedPid, receivedServerMsg);
+                    var receivedServierToken = Guid.Parse(split[1].Trim());
+#if DEBUG
+                    Console.WriteLine($"SentinelClient received: {receivedPid} - {receivedServierToken}.");
+#endif
+                    _sentinelServers.TryAdd(receivedPid, receivedServierToken);
                 }
 
                 if (cancellationToken.IsCancellationRequested)

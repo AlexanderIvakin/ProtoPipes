@@ -45,8 +45,10 @@ namespace ProtoPipes
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            var msg = $"{_pid}:Server with {_pid} executing very important task";
+            var msg = $"{_pid}:{_serverToken}";
+#if DEBUG
             Console.WriteLine($"SentinelServer: {msg}.");
+#endif
             var bytes = Encoding.UTF8.GetBytes(msg);
             try
             {
