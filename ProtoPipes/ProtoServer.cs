@@ -44,7 +44,7 @@ namespace ProtoPipes
                 var pid = Process.GetCurrentProcess().Id;
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    Thread.Sleep(pauseMilliseconds);
+                    await Task.Delay(TimeSpan.FromMilliseconds(pauseMilliseconds), cancellationToken);
 
                     var msg = $"{pid}:{r.Next(maxRandom)}";
                     Console.WriteLine($"Server: {msg}.");

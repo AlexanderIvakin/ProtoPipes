@@ -68,6 +68,7 @@ namespace ProtoPipes
             var pid = serverPid ?? AskUserToWhichServerToConnect();
 
             _client = new ProtoClient(pid);
+
             _client.Run(cancellationToken);
         }
 
@@ -102,7 +103,9 @@ namespace ProtoPipes
                 }
 
                 Console.WriteLine("Looking for running servers...");
-                Thread.Sleep(TimeSpan.FromSeconds(waitSeconds));
+
+                Task.Delay(TimeSpan.FromSeconds(waitSeconds), token).Wait(token);
+
                 cts.Cancel();
                 var snapshot = servers.ToDictionary(p => p.Key, p => p.Value);
                 if (snapshot.Count == 0)
