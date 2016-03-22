@@ -7,17 +7,32 @@ using System.Threading.Tasks;
 
 namespace ProtoPipes
 {
-    public class SentinelClient
+    public class SentinelClient: IDisposable
     {
         private readonly ConcurrentDictionary<int, Guid> _sentinelServers;
+
+        private CancellationTokenSource _stopTokenSource;
 
         public SentinelClient(ConcurrentDictionary<int, Guid> sentinelServers)
         {
             _sentinelServers = sentinelServers;
         }
 
+        public Task Run()
+        {
+            _stopTokenSource?.Dispose();
+
+            _stopTokenSource = new CancellationTokenSource();
+
+            return Task.Factory.StartNew(async () => await ListenLoop(_stopTokenSource.Token), _stopTokenSource.Token);
+        }
+
         public Task Run(CancellationToken cancellationToken)
         {
+            _stopTokenSource?.Dispose();
+
+            _stopTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
             return Task.Factory.StartNew(async () => await ListenLoop(cancellationToken), cancellationToken);
         }
 
@@ -61,6 +76,23 @@ namespace ProtoPipes
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                 }
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposing) return;
+
+            if (_stopTokenSource != null)
+            {
+                _stopTokenSource.Dispose();
+                _stopTokenSource = null;
             }
         }
     }

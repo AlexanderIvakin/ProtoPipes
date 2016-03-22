@@ -12,20 +12,47 @@ namespace ProtoPipes
 
         private readonly int _serverPid;
 
+        private CancellationTokenSource _stopTokenSource;
+
         public ProtoClient(int serverPid)
         {
             _serverPid = serverPid;
+        }
+
+        public Task Run()
+        {
+            return Run(CancellationToken.None);
         }
         
         public Task Run(CancellationToken cancellationToken)
         {
             _clientStream?.Dispose();
 
+            _stopTokenSource?.Dispose();
+
             _clientStream = new NamedPipeClientStream(".", "protopipe", PipeDirection.InOut, 
                 PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
+            _stopTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            return Task.Factory.StartNew(async p => await ListenLoop((int?)p, _stopTokenSource.Token),
+                _serverPid, _stopTokenSource.Token);                
+        }
+
+        private Task RunInternal(CancellationToken cancellationToken)
+        {
+            _clientStream?.Dispose();
+
+            _clientStream = new NamedPipeClientStream(".", "protopipe", PipeDirection.InOut,
+                PipeOptions.Asynchronous | PipeOptions.WriteThrough);
+
             return Task.Factory.StartNew(async p => await ListenLoop((int?)p, cancellationToken),
-                _serverPid, cancellationToken);                
+                _serverPid, cancellationToken);
+        }
+
+        public void Stop()
+        {
+            _stopTokenSource?.Cancel();
         }
 
         private async Task ListenLoop(int? serverPid, CancellationToken cancellationToken)
@@ -77,7 +104,7 @@ namespace ProtoPipes
 
             if (doReconnect)
             {
-                await Run(cancellationToken);
+                await RunInternal(cancellationToken);
             }            
         }
 
@@ -95,6 +122,12 @@ namespace ProtoPipes
             {
                 _clientStream.Dispose();
                 _clientStream = null;
+            }
+
+            if (_stopTokenSource != null)
+            {
+                _stopTokenSource.Dispose();
+                _stopTokenSource = null;
             }
         }
     }

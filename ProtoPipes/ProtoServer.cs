@@ -12,13 +12,39 @@ namespace ProtoPipes
     {
         private NamedPipeServerStream _serverStream;
 
+        private CancellationTokenSource _stopTokenSource;
+
+        public Task Run()
+        {
+            return Run(CancellationToken.None);
+        }
+
         public Task Run(CancellationToken cancellationToken)
         {
             _serverStream?.Dispose();
+            _stopTokenSource?.Dispose();
 
             _serverStream = new NamedPipeServerStream("protopipe", PipeDirection.InOut,
                 NamedPipeServerStream.MaxAllowedServerInstances,
                 PipeTransmissionMode.Message, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
+
+            _stopTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            return Task.Factory
+                .FromAsync(_serverStream.BeginWaitForConnection,
+                           _serverStream.EndWaitForConnection,
+                           TaskCreationOptions.LongRunning)
+                .ContinueWith(async t => await SpawnChild(_stopTokenSource.Token), _stopTokenSource.Token)
+                .ContinueWith(async t => await ServerLoop(_stopTokenSource.Token), _stopTokenSource.Token);
+        }
+
+        private Task RunChild(CancellationToken cancellationToken)
+        {
+            _serverStream?.Dispose();
+
+            _serverStream = new NamedPipeServerStream("protopipe", PipeDirection.InOut,
+                            NamedPipeServerStream.MaxAllowedServerInstances,
+                            PipeTransmissionMode.Message, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
             return Task.Factory
                 .FromAsync(_serverStream.BeginWaitForConnection,
@@ -28,10 +54,15 @@ namespace ProtoPipes
                 .ContinueWith(async t => await ServerLoop(cancellationToken), cancellationToken);
         }
 
+        public void Stop()
+        {
+            _stopTokenSource?.Cancel();            
+        }
+
         private async Task SpawnChild(CancellationToken cancellationToken)
         {
             var child = new ProtoServer();
-            await child.Run(cancellationToken);
+            await child.RunChild(cancellationToken);
         }
 
         private async Task ServerLoop(CancellationToken cancellationToken)
@@ -88,6 +119,12 @@ namespace ProtoPipes
             {
                 _serverStream.Dispose();
                 _serverStream = null;
+            }
+
+            if (_stopTokenSource != null)
+            {
+                _stopTokenSource.Dispose();
+                _stopTokenSource = null;
             }
         }
     }

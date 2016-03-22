@@ -15,20 +15,51 @@ namespace ProtoPipes
 
         private NamedPipeServerStream _serverStream;
 
+        private CancellationTokenSource _stopTokenSource;
+
         public SentinelServer(int pid, Guid serverToken)
         {
             _pid = pid;
             _serverToken = serverToken;
         }
 
+        public Task Run()
+        {
+            return Run(CancellationToken.None);
+        }
+
         public Task Run(CancellationToken cancellationToken)
         {
             _serverStream?.Dispose();
+
+            _stopTokenSource?.Dispose();
 
             _serverStream = new NamedPipeServerStream("protosentinel", PipeDirection.InOut,
                 NamedPipeServerStream.MaxAllowedServerInstances, 
                 PipeTransmissionMode.Message, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
+            _stopTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            return Task.Factory
+                .FromAsync(_serverStream.BeginWaitForConnection,
+                    _serverStream.EndWaitForConnection,
+                    TaskCreationOptions.LongRunning)
+                .ContinueWith(async t => await SpawnChild(_stopTokenSource.Token), _stopTokenSource.Token)
+                .ContinueWith(async t => await ServerLoop(_stopTokenSource.Token), _stopTokenSource.Token);
+        }
+
+        public void Stop()
+        {
+            _stopTokenSource?.Cancel();
+        }
+
+        private Task RunChild(CancellationToken cancellationToken)
+        {
+            _serverStream?.Dispose();
+
+            _serverStream = new NamedPipeServerStream("protosentinel", PipeDirection.InOut,
+                NamedPipeServerStream.MaxAllowedServerInstances,
+                PipeTransmissionMode.Message, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
             return Task.Factory
                 .FromAsync(_serverStream.BeginWaitForConnection,
@@ -74,7 +105,7 @@ namespace ProtoPipes
         private async Task SpawnChild(CancellationToken cancellationToken)
         {
             var child = new SentinelServer(_pid, _serverToken);
-            await child.Run(cancellationToken);
+            await child.RunChild(cancellationToken);
         }
 
         public void Dispose()
@@ -91,6 +122,12 @@ namespace ProtoPipes
             {
                 _serverStream.Dispose();
                 _serverStream = null;
+            }
+
+            if (_stopTokenSource != null)
+            {
+                _stopTokenSource.Dispose();
+                _stopTokenSource = null;
             }
         }
     }
