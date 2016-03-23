@@ -38,10 +38,17 @@ namespace ProtoPipes
 
         private async Task ListenLoop(CancellationToken cancellationToken)
         {
+            const int connectTimeout = 500;
+
             using (var clientStream = new NamedPipeClientStream(".", "protosentinel", PipeDirection.InOut,
                 PipeOptions.Asynchronous | PipeOptions.WriteThrough))
             {
-                clientStream.Connect();
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                clientStream.Connect(connectTimeout);
 
                 clientStream.ReadMode = PipeTransmissionMode.Message;
 
