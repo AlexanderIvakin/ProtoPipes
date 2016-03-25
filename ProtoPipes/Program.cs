@@ -30,69 +30,32 @@ namespace ProtoPipes
                 serverPid = int.Parse(args[1]);
             }
 
-            //using (var cts = new CancellationTokenSource())
-            //{                
-            //    var token = cts.Token;
-            //    switch (type)
-            //    {
-            //        case "server":
-            //            Console.WriteLine($"Running server with PID: {Process.GetCurrentProcess().Id}.");
-            //            RunSentinel(Process.GetCurrentProcess().Id, Guid.NewGuid(), token);
-            //            RunServer(token);
-            //            break;
-            //        case "client":
-            //            Console.WriteLine($"Running client with PID: {Process.GetCurrentProcess().Id}.");
-            //            RunClient(token, serverPid);
-            //            break;
-            //        default:
-            //            Console.WriteLine("Usage: ProtoPipes.exe [server|client]");
-            //            Environment.Exit(2);
-            //            break;
-            //    }
-
-            //    Console.WriteLine("Press any key to quit.");
-            //    Console.ReadKey();
-
-            //    cts.Cancel();
-            //}
-
             var pid = Process.GetCurrentProcess().Id;
 
-            switch (type)
+            using (var cts = new CancellationTokenSource())
             {
-                case "server":
-                    Console.WriteLine($"Running server with PID: {pid}.");
-                    RunSentinel(pid, Guid.NewGuid(), CancellationToken.None);
-                    RunServer(CancellationToken.None);
-                    break;
-                case "client":
-                    Console.WriteLine($"Running client with PID: {pid}.");
-                    RunClient(CancellationToken.None, serverPid);
-                    break;
-                default:
-                    Console.WriteLine("Usage: ProtoPipes.exe [server|client]");
-                    Environment.Exit(2);
-                    break;
-            }
+                var token = cts.Token;
+                switch (type)
+                {
+                    case "server":
+                        Console.WriteLine($"Running server with PID: {pid}.");
+                        RunSentinel(pid, Guid.NewGuid(), token);
+                        RunServer(token);
+                        break;
+                    case "client":
+                        Console.WriteLine($"Running client with PID: {pid}.");
+                        RunClient(token, serverPid);
+                        break;
+                    default:
+                        Console.WriteLine("Usage: ProtoPipes.exe [server|client]");
+                        Environment.Exit(2);
+                        break;
+                }
 
-            Console.WriteLine("Press any key to exit.");
-            Console.ReadKey();
+                Console.WriteLine("Press any key to quit.");
+                Console.ReadKey();
 
-            switch (type)
-            {
-                case "server":
-                    Console.WriteLine($"Stopping server with PID: {pid}.");
-                    StopServer();
-                    StopSentinel();
-                    break;
-                case "client":
-                    Console.WriteLine($"Stopping client with PID: {pid}.");
-                    StopClient();
-                    break;
-                default:
-                    Console.WriteLine("Usage: ProtoPipes.exe [server|client]");
-                    Environment.Exit(2);
-                    break;
+                cts.Cancel();
             }
         }
 
