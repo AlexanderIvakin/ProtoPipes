@@ -13,6 +13,8 @@ namespace ProtoPipes
 
         private static ProtoServer _server;
 
+        private static ProtoCommandServer _commandServer;
+
         private static SentinelServer _sentinelServer;
 
         static void Main(string[] args)
@@ -40,6 +42,7 @@ namespace ProtoPipes
                     case "server":
                         Console.WriteLine($"Running server with PID: {pid}.");
                         RunSentinel(pid, Guid.NewGuid(), token);
+                        RunCommandServer(token);
                         RunServer(token);
                         break;
                     case "client":
@@ -57,6 +60,12 @@ namespace ProtoPipes
 
                 cts.Cancel();
             }
+        }
+
+        private static void RunCommandServer(CancellationToken token)
+        {
+            _commandServer = new ProtoCommandServer();
+            _commandServer.Run(token);
         }
 
         private static void RunSentinel(int pid, Guid serverToken, CancellationToken cancellationToken)
