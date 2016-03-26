@@ -46,6 +46,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ProtoClient.cs" />
+    <Compile Include="ProtoCommandClient.cs" />
     <Compile Include="ProtoCommandServer.cs" />
     <Compile Include="ProtoServer.cs" />
     <Compile Include="SentinelClient.cs" />

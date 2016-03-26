@@ -15,6 +15,8 @@ namespace ProtoPipes
 
         private static ProtoCommandServer _commandServer;
 
+        private static ProtoCommandClient _commandClient;
+
         private static SentinelServer _sentinelServer;
 
         static void Main(string[] args)
@@ -42,12 +44,13 @@ namespace ProtoPipes
                     case "server":
                         Console.WriteLine($"Running server with PID: {pid}.");
                         RunSentinel(pid, Guid.NewGuid(), token);
-                        RunCommandServer(token);
+                        RunCommandServer(cts);
                         RunServer(token);
                         break;
                     case "client":
                         Console.WriteLine($"Running client with PID: {pid}.");
-                        RunClient(token, serverPid);
+                        Console.CancelKeyPress += OnCancelKeyPress;
+                        RunClient(token, serverPid).ConfigureAwait(false);
                         break;
                     default:
                         Console.WriteLine("Usage: ProtoPipes.exe [server|client]");
@@ -55,17 +58,30 @@ namespace ProtoPipes
                         break;
                 }
 
-                Console.WriteLine("Press any key to quit.");
-                Console.ReadKey();
+                Console.WriteLine("Press 'x' key to quit.");
+                while (true)
+                {
+                    var cki = Console.ReadKey();
+                    if (cki.KeyChar == 'x') break;
+                }
 
                 cts.Cancel();
             }
         }
 
-        private static void RunCommandServer(CancellationToken token)
+        private static void OnCancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        {
+            Console.WriteLine("Sending 'Stop all' to the server");
+            _commandClient.StopAll();
+            Console.WriteLine("Exiting...");
+        }
+
+        private static void RunCommandServer(CancellationTokenSource cts)
         {
             _commandServer = new ProtoCommandServer();
-            _commandServer.Run(token);
+            _commandServer.StopAll += (s, e) => { cts.Cancel(); };
+            _commandServer.GetTime += (s, e) => { Console.WriteLine(DateTime.Now); };
+            _commandServer.Run(cts.Token);
         }
 
         private static void RunSentinel(int pid, Guid serverToken, CancellationToken cancellationToken)
@@ -79,13 +95,23 @@ namespace ProtoPipes
             _sentinelServer.Stop();
         }
 
-        private static void RunClient(CancellationToken cancellationToken, int? serverPid)
+        private static async Task RunClient(CancellationToken cancellationToken, int? serverPid)
         {
             var pid = serverPid ?? AskUserToWhichServerToConnect();
 
             _client = new ProtoClient(pid);
+            await _client.Run(cancellationToken);
 
-            _client.Run(cancellationToken);
+            _commandClient = new ProtoCommandClient(pid);
+            await _commandClient.Connect(cancellationToken);
+            await Task.Factory.StartNew(async () =>
+             {
+                 while (true)
+                 {
+                     await Task.Delay(TimeSpan.FromSeconds(5));
+                     _commandClient.GetTime();
+                 }
+             }, cancellationToken);
         }
 
         private static void StopClient()
