@@ -21,58 +21,71 @@ namespace ProtoPipes
 
         static void Main(string[] args)
         {
-            if (args.Length < 1)
+            try
             {
-                Console.WriteLine("Usage: ProtoPipes.exe [server|client {serverPID}]");
-                Environment.Exit(2);
-            }
-            var type = args[0];
-
-            int? serverPid = null;
-            if (args.Length == 2)
-            {
-                serverPid = int.Parse(args[1]);
-            }
-
-            var pid = Process.GetCurrentProcess().Id;
-
-            using (var cts = new CancellationTokenSource())
-            {
-                var token = cts.Token;
-                switch (type)
+                if (args.Length < 1)
                 {
-                    case "server":
-                        Console.WriteLine($"Running server with PID: {pid}.");
-                        RunSentinel(pid, Guid.NewGuid(), token);
-                        RunCommandServer(cts);
-                        RunServer(token);
-                        break;
-                    case "client":
-                        Console.WriteLine($"Running client with PID: {pid}.");
-                        Console.CancelKeyPress += OnCancelKeyPress;
-                        RunClient(token, serverPid).ConfigureAwait(false);
-                        break;
-                    default:
-                        Console.WriteLine("Usage: ProtoPipes.exe [server|client]");
-                        Environment.Exit(2);
-                        break;
+                    Console.WriteLine("Usage: ProtoPipes.exe [server|client {serverPID}]");
+                    Environment.Exit(2);
+                }
+                var type = args[0];
+
+                int? serverPid = null;
+                if (args.Length == 2)
+                {
+                    serverPid = int.Parse(args[1]);
                 }
 
-                Console.WriteLine("Press 'x' key to quit.");
-                while (true)
-                {
-                    var cki = Console.ReadKey();
-                    if (cki.KeyChar == 'x') break;
-                }
+                var pid = Process.GetCurrentProcess().Id;
 
-                cts.Cancel();
+                using (var cts = new CancellationTokenSource())
+                {
+                    var token = cts.Token;
+                    switch (type)
+                    {
+                        case "server":
+                            Console.WriteLine($"Running server with PID: {pid}.");
+                            RunSentinel(pid, Guid.NewGuid(), token);
+                            RunCommandServer(cts);
+                            RunServer(token);
+                            break;
+                        case "client":
+                            Console.WriteLine($"Running client with PID: {pid}.");
+                            Console.CancelKeyPress += async (s,e) => await OnCancelKeyPress(s, e);
+                            RunClient(token, serverPid).ConfigureAwait(false);
+                            break;
+                        default:
+                            Console.WriteLine("Usage: ProtoPipes.exe [server|client]");
+                            Environment.Exit(2);
+                            break;
+                    }
+
+                    Console.WriteLine("Press 'x' key to quit.");
+                    while (true)
+                    {
+                        var cki = Console.ReadKey();
+                        if (cki.KeyChar == 'x') break;
+                    }
+
+                    cts.Cancel();
+                }
+            }
+            finally
+            {
+                _commandServer?.Dispose();
+                _commandClient?.Dispose();
+
+                _sentinelServer?.Dispose();
+
+                _server?.Dispose();
+                _client?.Dispose();
             }
         }
 
-        private static void OnCancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        private static async Task OnCancelKeyPress(object sender, ConsoleCancelEventArgs e)
         {
             Console.WriteLine("Sending 'Stop all' to the server");
-            _commandClient.StopAll();
+            await _commandClient.StopAll();
             Console.WriteLine("Exiting...");
         }
 
@@ -109,7 +122,7 @@ namespace ProtoPipes
                  while (true)
                  {
                      await Task.Delay(TimeSpan.FromSeconds(5));
-                     _commandClient.GetTime();
+                     await _commandClient.GetTime();
                  }
              }, cancellationToken);
         }

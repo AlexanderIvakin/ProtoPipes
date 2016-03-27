@@ -73,26 +73,26 @@ namespace ProtoPipes
             return false;
         }
 
-        public void StopAll()
+        public async Task StopAll()
         {
             _are.WaitOne();
             var msg = @"stopall";
             var buff = Encoding.UTF8.GetBytes(msg);
             if (_clientStream.IsConnected)
             {
-                 _clientStream.Write(buff, 0, buff.Length);
+                 await _clientStream.WriteAsync(buff, 0, buff.Length);
             }
             _are.Set();
         }
 
-        public void GetTime()
+        public async Task GetTime()
         {
             _are.WaitOne();
             var msg = @"gettime";
             var buff = Encoding.UTF8.GetBytes(msg);
             if (_clientStream.IsConnected)
             {
-                _clientStream.Write(buff, 0, buff.Length);
+                await _clientStream.WriteAsync(buff, 0, buff.Length);
             }
             _are.Set();
         }
@@ -111,6 +111,12 @@ namespace ProtoPipes
             {
                 _clientStream.Dispose();
                 _clientStream = null;
+            }
+
+            if (_are != null)
+            {
+                _are.Dispose();
+                _are = null;
             }
         }
     }
