@@ -75,6 +75,7 @@ namespace ProtoPipes
         private async Task SpawnChild(CancellationToken cancellationToken)
         {
             var child = new ProtoCommandServer();
+            child.StopAll += StopAll;
             await child.RunInternal(cancellationToken);
         }
 
