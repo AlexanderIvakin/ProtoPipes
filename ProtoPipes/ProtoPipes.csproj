@@ -51,6 +51,7 @@
     <Compile Include="ProtoServer.cs" />
     <Compile Include="SentinelClient.cs" />
     <Compile Include="SentinelServer.cs" />
+    <Compile Include="ServerInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

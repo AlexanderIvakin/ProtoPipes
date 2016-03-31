@@ -14,6 +14,13 @@ namespace ProtoPipes
 
         private CancellationTokenSource _stopTokenSource;
 
+        private readonly Guid _serverToken;
+
+        public ProtoServer(Guid serverToken)
+        {
+            _serverToken = serverToken;
+        }
+
         public Task Run()
         {
             return Run(CancellationToken.None);
@@ -24,7 +31,7 @@ namespace ProtoPipes
             _serverStream?.Dispose();
             _stopTokenSource?.Dispose();
 
-            _serverStream = new NamedPipeServerStream("protopipe", PipeDirection.InOut,
+            _serverStream = new NamedPipeServerStream(_serverToken.ToString(), PipeDirection.InOut,
                 NamedPipeServerStream.MaxAllowedServerInstances,
                 PipeTransmissionMode.Message, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
@@ -42,7 +49,7 @@ namespace ProtoPipes
         {
             _serverStream?.Dispose();
 
-            _serverStream = new NamedPipeServerStream("protopipe", PipeDirection.InOut,
+            _serverStream = new NamedPipeServerStream(_serverToken.ToString(), PipeDirection.InOut,
                             NamedPipeServerStream.MaxAllowedServerInstances,
                             PipeTransmissionMode.Message, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
@@ -61,7 +68,7 @@ namespace ProtoPipes
 
         private async Task SpawnChild(CancellationToken cancellationToken)
         {
-            var child = new ProtoServer();
+            var child = new ProtoServer(_serverToken);
             await child.RunChild(cancellationToken);
         }
 

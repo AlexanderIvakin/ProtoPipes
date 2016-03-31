@@ -45,13 +45,15 @@ namespace ProtoPipes
                     {
                         case "server":
                             Console.WriteLine($"Running server with PID: {pid}.");
-                            RunSentinel(pid, Guid.NewGuid(), token);
-                            RunCommandServer(cts);
-                            RunServer(token);
+                            var notificationServerToken = Guid.NewGuid();
+                            var commandServerToken = Guid.NewGuid();
+                            RunSentinel(pid, notificationServerToken, commandServerToken, token);
+                            RunCommandServer(commandServerToken, cts);
+                            RunServer(notificationServerToken, token);
                             break;
                         case "client":
                             Console.WriteLine($"Running client with PID: {pid}.");
-                            Console.CancelKeyPress += async (s,e) => await OnCancelKeyPress(s, e);
+                            Console.CancelKeyPress += OnCancelKeyPress;
                             RunClient(token, serverPid).ConfigureAwait(false);
                             break;
                         default:
@@ -82,24 +84,25 @@ namespace ProtoPipes
             }
         }
 
-        private static async Task OnCancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        private static void OnCancelKeyPress(object sender, ConsoleCancelEventArgs e)
         {
             Console.WriteLine("Sending 'Stop all' to the server");
-            await _commandClient.StopAll();
+            _commandClient.StopAll();
             Console.WriteLine("Exiting...");
         }
 
-        private static void RunCommandServer(CancellationTokenSource cts)
+        private static void RunCommandServer(Guid commandServerToken, CancellationTokenSource cts)
         {
-            _commandServer = new ProtoCommandServer();
+            _commandServer = new ProtoCommandServer(commandServerToken);
             _commandServer.StopAll += (s, e) => { cts.Cancel(); };
             _commandServer.GetTime += (s, e) => { Console.WriteLine(DateTime.Now); };
             _commandServer.Run(cts.Token);
         }
 
-        private static void RunSentinel(int pid, Guid serverToken, CancellationToken cancellationToken)
+        private static void RunSentinel(int pid, Guid notificationServerToken, 
+            Guid commandServerToken, CancellationToken cancellationToken)
         {
-            _sentinelServer = new SentinelServer(pid, serverToken);
+            _sentinelServer = new SentinelServer(pid, notificationServerToken, commandServerToken);
             _sentinelServer.Run(cancellationToken);
         }
 
@@ -110,19 +113,19 @@ namespace ProtoPipes
 
         private static async Task RunClient(CancellationToken cancellationToken, int? serverPid)
         {
-            var pid = serverPid ?? AskUserToWhichServerToConnect();
+            var serverInfo = AskUserToWhichServerToConnect();
 
-            _client = new ProtoClient(pid);
+            _client = new ProtoClient(serverInfo.NotificationServerToken);
             await _client.Run(cancellationToken);
 
-            _commandClient = new ProtoCommandClient(pid);
-            await _commandClient.Connect(cancellationToken);
+            _commandClient = new ProtoCommandClient(serverInfo.CommandServerToken);
+            _commandClient.Connect(cancellationToken);
             await Task.Factory.StartNew(async () =>
              {
                  while (true)
                  {
                      await Task.Delay(TimeSpan.FromSeconds(5));
-                     await _commandClient.GetTime();
+                     _commandClient.GetTime();
                  }
              }, cancellationToken);
         }
@@ -132,14 +135,14 @@ namespace ProtoPipes
             _client.Stop();
         }
 
-        private static int AskUserToWhichServerToConnect()
+        private static ServerInfo AskUserToWhichServerToConnect()
         {
             using (var cts = new CancellationTokenSource())
             {
                 var token = cts.Token;
-                var servers = new ConcurrentDictionary<int, Guid>();
+                var servers = new ConcurrentDictionary<int, ServerInfo>();
 
-                const int waitSeconds = 5;
+                const int waitSeconds = 2;
                 const int maxTries = 5;
                 var trie = 0;
 
@@ -209,14 +212,14 @@ namespace ProtoPipes
                     Console.WriteLine("Please try again...");
                 }
 
-                return keys[selectedIdx - 1];
+                return snapshot[keys[selectedIdx - 1]];
 
             }
         }
 
-        private static void RunServer(CancellationToken cancellationToken)
+        private static void RunServer(Guid notificationServerToken, CancellationToken cancellationToken)
         {
-            _server = new ProtoServer();
+            _server = new ProtoServer(notificationServerToken);
             _server.Run(cancellationToken);
         }
 

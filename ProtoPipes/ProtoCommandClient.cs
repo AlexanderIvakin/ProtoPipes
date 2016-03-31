@@ -10,91 +10,50 @@ namespace ProtoPipes
     {
         private NamedPipeClientStream _clientStream;
 
-        private readonly int _serverPid;
+        private readonly Guid _serverToken;
 
-        private AutoResetEvent _are;
+        private readonly object _pipeLock = new object();
 
-        public ProtoCommandClient(int serverPid)
+        public ProtoCommandClient(Guid serverToken)
         {
-            _serverPid = serverPid;
-            _are = new AutoResetEvent(false);
+            _serverToken = serverToken;
         }
 
-        public async Task Connect(CancellationToken cancellationToken)
+        public void Connect(CancellationToken cancellationToken)
         {
             const int connectTimeout = 500;
-            const int maxTries = 5;
-            var trie = 0;
-            var connected = false;
 
-            while (trie < maxTries)
-            {
-                trie++;
-                _clientStream?.Dispose();
+            _clientStream = new NamedPipeClientStream(".", _serverToken.ToString(),
+                PipeDirection.InOut, PipeOptions.Asynchronous);
 
-                _clientStream = new NamedPipeClientStream(".", "protocommands",
-                    PipeDirection.InOut, PipeOptions.Asynchronous);
-
-                _clientStream.Connect(connectTimeout);
-                _clientStream.ReadMode = PipeTransmissionMode.Message;
-
-                connected = await Handshake(cancellationToken);
-                if (connected)
-                {
-                    _are.Set();
-                    break;
-                }
-            }
-
-            if (!connected)
-            {
-                throw new ApplicationException($"Failed to connect to the server running at {_serverPid}");
-            }
+            _clientStream.Connect(connectTimeout);
+            _clientStream.ReadMode = PipeTransmissionMode.Message;
         }
 
-        private async Task<bool> Handshake(CancellationToken cancellationToken)
+        public void StopAll()
         {
-            const int bufferLength = 1024;
-            var buffer = new byte[bufferLength];
-            var sb = new StringBuilder();
-
-            do
-            {
-                var bytesRead = await _clientStream.ReadAsync(buffer, 0, bufferLength, cancellationToken);
-                sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
-            } while (!_clientStream.IsMessageComplete);
-            var msg = sb.ToString();
-
-            int receivedPid;
-            if (int.TryParse(msg, out receivedPid))
-            {
-                return receivedPid == _serverPid;
-            }
-            return false;
-        }
-
-        public async Task StopAll()
-        {
-            _are.WaitOne();
             var msg = @"stopall";
             var buff = Encoding.UTF8.GetBytes(msg);
-            if (_clientStream.IsConnected)
+            lock (_pipeLock)
             {
-                 await _clientStream.WriteAsync(buff, 0, buff.Length);
+                if (_clientStream.IsConnected)
+                {
+                    _clientStream.Write(buff, 0, buff.Length);
+                }
             }
-            _are.Set();
         }
 
-        public async Task GetTime()
+        public void GetTime()
         {
-            _are.WaitOne();
             var msg = @"gettime";
             var buff = Encoding.UTF8.GetBytes(msg);
-            if (_clientStream.IsConnected)
+            lock (_pipeLock)
             {
-                await _clientStream.WriteAsync(buff, 0, buff.Length);
+                if (_clientStream.IsConnected)
+                {
+                    _clientStream.Write(buff, 0, buff.Length);
+                }
             }
-            _are.Set();
         }
 
         public void Dispose()
@@ -107,17 +66,8 @@ namespace ProtoPipes
         {
             if (!disposing) return;
 
-            if (_clientStream != null)
-            {
-                _clientStream.Dispose();
-                _clientStream = null;
-            }
-
-            if (_are != null)
-            {
-                _are.Dispose();
-                _are = null;
-            }
+            _clientStream?.Dispose();
+            _clientStream = null;
         }
     }
 }

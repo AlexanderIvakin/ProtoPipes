@@ -9,11 +9,11 @@ namespace ProtoPipes
 {
     public class SentinelClient: IDisposable
     {
-        private readonly ConcurrentDictionary<int, Guid> _sentinelServers;
+        private readonly ConcurrentDictionary<int, ServerInfo> _sentinelServers;
 
         private CancellationTokenSource _stopTokenSource;
 
-        public SentinelClient(ConcurrentDictionary<int, Guid> sentinelServers)
+        public SentinelClient(ConcurrentDictionary<int, ServerInfo> sentinelServers)
         {
             _sentinelServers = sentinelServers;
         }
@@ -69,14 +69,21 @@ namespace ProtoPipes
                 var msg = sb.ToString();                
 
                 var split = msg.Split(':');
-                if (split.Length > 1)
+                if (split.Length > 2)
                 {                   
-                    var receivedPid = int.Parse(split[0].Trim());
-                    var receivedServierToken = Guid.Parse(split[1].Trim());
+                    int receivedPid;
+                    if (!int.TryParse(split[0].Trim(), out receivedPid)) return;
+
+                    Guid receivedNotificationServerToken;
+                    if (!Guid.TryParse(split[1].Trim(), out receivedNotificationServerToken)) return;
+
+                    Guid receivedCommandServerToken;
+                    if (!Guid.TryParse(split[2].Trim(), out receivedCommandServerToken)) return;
 #if DEBUG
                     Console.WriteLine($"SentinelClient received: {receivedPid} - {receivedServierToken}.");
 #endif
-                    _sentinelServers.TryAdd(receivedPid, receivedServierToken);
+                    _sentinelServers.TryAdd(receivedPid, 
+                        new ServerInfo(receivedPid, receivedNotificationServerToken, receivedCommandServerToken));
                 }
 
                 if (cancellationToken.IsCancellationRequested)

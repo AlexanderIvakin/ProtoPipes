@@ -10,13 +10,13 @@ namespace ProtoPipes
     {
         private NamedPipeClientStream _clientStream;
 
-        private readonly int _serverPid;
+        private readonly Guid _serverToken;
 
         private CancellationTokenSource _stopTokenSource;
 
-        public ProtoClient(int serverPid)
+        public ProtoClient(Guid serverToken)
         {
-            _serverPid = serverPid;
+            _serverToken = serverToken;
         }
 
         public Task Run()
@@ -30,24 +30,22 @@ namespace ProtoPipes
 
             _stopTokenSource?.Dispose();
 
-            _clientStream = new NamedPipeClientStream(".", "protopipe", PipeDirection.InOut, 
+            _clientStream = new NamedPipeClientStream(".", _serverToken.ToString(), PipeDirection.InOut, 
                 PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
             _stopTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-            return Task.Factory.StartNew(async p => await ListenLoop((int?)p, _stopTokenSource.Token),
-                _serverPid, _stopTokenSource.Token);                
+            return Task.Factory.StartNew(async () => await ListenLoop(_stopTokenSource.Token), _stopTokenSource.Token);                
         }
 
         private Task RunInternal(CancellationToken cancellationToken)
         {
             _clientStream?.Dispose();
 
-            _clientStream = new NamedPipeClientStream(".", "protopipe", PipeDirection.InOut,
+            _clientStream = new NamedPipeClientStream(".", _serverToken.ToString(), PipeDirection.InOut,
                 PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
-            return Task.Factory.StartNew(async p => await ListenLoop((int?)p, cancellationToken),
-                _serverPid, cancellationToken);
+            return Task.Factory.StartNew(async () => await ListenLoop(cancellationToken), cancellationToken);
         }
 
         public void Stop()
@@ -55,7 +53,7 @@ namespace ProtoPipes
             _stopTokenSource?.Cancel();
         }
 
-        private async Task ListenLoop(int? serverPid, CancellationToken cancellationToken)
+        private async Task ListenLoop(CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -69,7 +67,6 @@ namespace ProtoPipes
             const int bufferLength = 1024;
             var buffer = new byte[bufferLength];
             var sb = new StringBuilder();
-            var doReconnect = false;
 
             while (_clientStream.IsConnected 
                 && !cancellationToken.IsCancellationRequested)
@@ -83,28 +80,11 @@ namespace ProtoPipes
                 var msg = sb.ToString();
                 Console.WriteLine($"Client received: {msg}.");
                 sb.Clear();
-
-                if (!serverPid.HasValue) continue;
-
-                var split = msg.Split(':');
-                if (split.Length > 1)
-                {
-                    var receivedPid = int.Parse(split[0]);
-                    if (receivedPid == serverPid.Value) continue;
-                    Console.WriteLine($"Wrong server {receivedPid}. Attempting to reconnect to {serverPid}.");
-                    doReconnect = true;
-                    break;
-                }                
             }
 
             if (cancellationToken.IsCancellationRequested)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-            }
-
-            if (doReconnect)
-            {
-                await RunInternal(cancellationToken);
             }            
         }
 
@@ -118,17 +98,11 @@ namespace ProtoPipes
         {
             if (!disposing) return;
 
-            if (_clientStream != null)
-            {
-                _clientStream.Dispose();
-                _clientStream = null;
-            }
+            _clientStream?.Dispose();
+            _clientStream = null;
 
-            if (_stopTokenSource != null)
-            {
-                _stopTokenSource.Dispose();
-                _stopTokenSource = null;
-            }
+            _stopTokenSource?.Dispose();
+            _stopTokenSource = null;
         }
     }
 }

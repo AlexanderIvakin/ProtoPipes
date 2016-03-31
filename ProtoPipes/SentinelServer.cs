@@ -11,16 +11,19 @@ namespace ProtoPipes
     {
         private readonly int _pid;
 
-        private readonly Guid _serverToken;
+        private readonly Guid _notificationServerToken;
+
+        private readonly Guid _commandServerToken;
 
         private NamedPipeServerStream _serverStream;
 
         private CancellationTokenSource _stopTokenSource;
 
-        public SentinelServer(int pid, Guid serverToken)
+        public SentinelServer(int pid, Guid notificationServerToken, Guid commandServerToken)
         {
             _pid = pid;
-            _serverToken = serverToken;
+            _notificationServerToken = notificationServerToken;
+            _commandServerToken = commandServerToken;
         }
 
         public Task Run()
@@ -76,7 +79,7 @@ namespace ProtoPipes
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            var msg = $"{_pid}:{_serverToken}";
+            var msg = $"{_pid}:{_notificationServerToken}:{_commandServerToken}";
 #if DEBUG
             Console.WriteLine($"SentinelServer: {msg}.");
 #endif
@@ -104,7 +107,7 @@ namespace ProtoPipes
 
         private async Task SpawnChild(CancellationToken cancellationToken)
         {
-            var child = new SentinelServer(_pid, _serverToken);
+            var child = new SentinelServer(_pid, _notificationServerToken, _commandServerToken);
             await child.RunChild(cancellationToken);
         }
 
